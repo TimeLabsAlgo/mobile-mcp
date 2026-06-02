@@ -462,32 +462,6 @@ When launched, Mobile MCP can connect to:
 
 Make sure you have your mobile platform SDKs (Xcode, Android SDK) installed and configured properly before running Mobile Next Mobile MCP.
 
-### Telemetry
-
-Mobile MCP does not send telemetry by default. To explicitly opt in to anonymous usage telemetry via PostHog, set the `MOBILEMCP_ENABLE_TELEMETRY` environment variable:
-
-```bash
-MOBILEMCP_ENABLE_TELEMETRY=1 npx @mobilenext/mobile-mcp@latest
-```
-
-For json configurations:
-
-```json
-{
-  "mcpServers": {
-    "mobile-mcp": {
-      "command": "npx",
-      "args": ["-y", "@mobilenext/mobile-mcp@latest"],
-      "env": {
-        "MOBILEMCP_ENABLE_TELEMETRY": "1"
-      }
-    }
-  }
-}
-```
-
-Telemetry opt-in never sends screenshots, screen contents, typed text, tool arguments, tool responses, crash report contents, hostnames, or executable paths. The legacy `MOBILEMCP_DISABLE_TELEMETRY=1` setting is still respected and takes precedence over opt-in.
-
 For private security testing, prefer pinning the package version instead of using `@latest`, for example `@mobilenext/mobile-mcp@0.0.57`, and use a dedicated test device or simulator without production accounts.
 
 ### Running in "headless" mode on Simulators/Emulators

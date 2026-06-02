@@ -22,7 +22,6 @@ For private security testing:
 
 - Use the default stdio transport or localhost-only SSE whenever possible.
 - If you bind SSE to a non-localhost interface, set `MOBILEMCP_AUTH` to require Bearer token authorization.
-- Telemetry is disabled by default. Only set `MOBILEMCP_ENABLE_TELEMETRY=1` if you explicitly want anonymous usage telemetry.
 - Logs are intended to avoid typed text, authorization values, tool arguments, and tool responses by default. Do not enable verbose logging in environments where device screens, crash reports, or typed values may be sensitive.
 - Treat `MOBILECLI_PATH`, `GO_IOS_PATH`, and platform SDK paths as trusted configuration. They control which local executables Mobile MCP invokes.
 - Use dedicated test devices, simulators, or emulators without production accounts for untrusted agent workflows.

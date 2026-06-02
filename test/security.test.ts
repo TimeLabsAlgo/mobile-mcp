@@ -1,69 +1,9 @@
 import assert from "node:assert";
-import os from "node:os";
 
 import { formatFatalError, hasValidBearerToken, isLocalSseHost, validateSseAuthConfiguration } from "../src/index";
 import { sanitizeForLog } from "../src/logger";
-import { createMcpServer, createTelemetryPayload, isTelemetryEnabled } from "../src/server";
 
 describe("security defaults", () => {
-	const originalFetch = globalThis.fetch;
-	const originalEnableTelemetry = process.env.MOBILEMCP_ENABLE_TELEMETRY;
-	const originalDisableTelemetry = process.env.MOBILEMCP_DISABLE_TELEMETRY;
-
-	afterEach(() => {
-		globalThis.fetch = originalFetch;
-
-		if (originalEnableTelemetry === undefined) {
-			delete process.env.MOBILEMCP_ENABLE_TELEMETRY;
-		} else {
-			process.env.MOBILEMCP_ENABLE_TELEMETRY = originalEnableTelemetry;
-		}
-
-		if (originalDisableTelemetry === undefined) {
-			delete process.env.MOBILEMCP_DISABLE_TELEMETRY;
-		} else {
-			process.env.MOBILEMCP_DISABLE_TELEMETRY = originalDisableTelemetry;
-		}
-	});
-
-	it("disables telemetry by default", async () => {
-		delete process.env.MOBILEMCP_ENABLE_TELEMETRY;
-		delete process.env.MOBILEMCP_DISABLE_TELEMETRY;
-
-		const calls: Array<{ url: unknown, init?: unknown }> = [];
-		globalThis.fetch = (async (url: unknown, init?: unknown) => {
-			calls.push({ url, init });
-			return { ok: true } as Response;
-		}) as typeof fetch;
-
-		createMcpServer();
-		await new Promise(resolve => setTimeout(resolve, 0));
-
-		assert.equal(isTelemetryEnabled(), false);
-		assert.equal(calls.length, 0);
-	});
-
-	it("requires explicit telemetry opt-in and lets disable win", () => {
-		delete process.env.MOBILEMCP_ENABLE_TELEMETRY;
-		delete process.env.MOBILEMCP_DISABLE_TELEMETRY;
-		assert.equal(isTelemetryEnabled(), false);
-
-		process.env.MOBILEMCP_ENABLE_TELEMETRY = "1";
-		assert.equal(isTelemetryEnabled(), true);
-
-		process.env.MOBILEMCP_DISABLE_TELEMETRY = "1";
-		assert.equal(isTelemetryEnabled(), false);
-	});
-
-	it("does not put stable host-derived identifiers into telemetry payloads", () => {
-		const payload = createTelemetryPayload("launch", {}, "0.0.0-test", "test-client");
-		const serialized = JSON.stringify(payload);
-
-		assert.ok(!serialized.includes(os.hostname()));
-		assert.ok(!serialized.includes(process.execPath));
-		assert.equal(payload.properties.AgentName, "test-client");
-	});
-
 	it("redacts sensitive log values", () => {
 		const output = sanitizeForLog({
 			text: "123456",

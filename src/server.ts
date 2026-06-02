@@ -3,7 +3,6 @@ import { z } from "zod";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { randomUUID } from "node:crypto";
 import { ChildProcess } from "node:child_process";
 
 import { error, sanitizeForLog, trace } from "./logger";
@@ -43,60 +42,12 @@ export const getAgentVersion = (): string => {
 	return json.version;
 };
 
-const POSTHOG_URL = "https://us.i.posthog.com/i/v0/e/";
-const POSTHOG_API_KEY = "phc_KHRTZmkDsU7A8EbydEK8s4lJpPoTDyyBhSlwer694cS";
-const telemetryDistinctId = randomUUID();
-
-export const isTelemetryEnabled = (): boolean => {
-	return process.env.MOBILEMCP_ENABLE_TELEMETRY === "1" && !process.env.MOBILEMCP_DISABLE_TELEMETRY;
-};
-
-export const createTelemetryPayload = (
-	event: string,
-	properties: Record<string, string | number>,
-	agentVersion: string,
-	clientName: string
-) => {
-	const systemProps: Record<string, string | number> = {
-		"Platform": os.platform(),
-		"Product": "mobile-mcp",
-		"Version": agentVersion,
-		"NodeVersion": process.version,
-		"CI": process.env.CI || "0",
-	};
-
-	if (clientName !== "unknown") {
-		systemProps.AgentName = clientName;
-	}
-
-	return {
-		api_key: POSTHOG_API_KEY,
-		event,
-		properties: {
-			...systemProps,
-			...properties,
-		},
-		distinct_id: telemetryDistinctId,
-	};
-};
-
 export const createMcpServer = (): McpServer => {
 
 	const server = new McpServer({
 		name: "mobile-mcp",
 		version: getAgentVersion(),
 	});
-
-
-	const getClientName = (): string => {
-		try {
-			const clientInfo = server.server.getClientVersion();
-			const clientName = clientInfo?.name || "unknown";
-			return clientName;
-		} catch (error: any) {
-			return "unknown";
-		}
-	};
 
 	type ZodSchemaShape = Record<string, z.ZodType>;
 
@@ -118,12 +69,10 @@ export const createMcpServer = (): McpServer => {
 				const response = await cb(args);
 				const duration = +new Date() - start;
 				trace(`Completed ${name} in ${duration}ms`);
-				posthog("tool_invoked", { "ToolName": name, "Duration": duration }).then();
 				return {
 					content: [{ type: "text", text: response }],
 				};
 			} catch (error: any) {
-				posthog("tool_failed", { "ToolName": name }).then();
 				if (error instanceof ActionableError) {
 					return {
 						content: [{ type: "text", text: `${error.message}. Please fix the issue and try again.` }],
@@ -140,28 +89,9 @@ export const createMcpServer = (): McpServer => {
 		}) as any);
 	};
 
-	const posthog = async (event: string, properties: Record<string, string | number>) => {
-		if (!isTelemetryEnabled()) {
-			return;
-		}
-
-		try {
-			await fetch(POSTHOG_URL, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json"
-				},
-				body: JSON.stringify(createTelemetryPayload(event, properties, getAgentVersion(), getClientName()))
-			});
-		} catch (err: any) {
-			// ignore
-		}
-	};
-
 	const mobilecli = new Mobilecli();
 	const activeRecordings = new Map<string, ActiveRecording>();
 	const agentVerifiedSimulators = new Set<string>();
-	posthog("launch", {}).then();
 
 	const ensureMobilecliAvailable = (): void => {
 		try {
@@ -675,7 +605,6 @@ export const createMcpServer = (): McpServer => {
 
 				const screenshot64 = screenshot.toString("base64");
 				trace(`Screenshot taken: ${screenshot.length} bytes`);
-				posthog("tool_invoked", { "ToolName": "mobile_take_screenshot" }).then();
 
 				return {
 					content: [{ type: "image", data: screenshot64, mimeType }]
