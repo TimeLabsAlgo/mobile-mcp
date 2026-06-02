@@ -1,7 +1,7 @@
 import assert from "node:assert";
 import os from "node:os";
 
-import { isLocalSseHost, validateSseAuthConfiguration } from "../src/index";
+import { formatFatalError, hasValidBearerToken, isLocalSseHost, validateSseAuthConfiguration } from "../src/index";
 import { sanitizeForLog } from "../src/logger";
 import { createMcpServer, createTelemetryPayload, isTelemetryEnabled } from "../src/server";
 
@@ -87,5 +87,20 @@ describe("security defaults", () => {
 		assert.doesNotThrow(() => validateSseAuthConfiguration("localhost"));
 		assert.doesNotThrow(() => validateSseAuthConfiguration("0.0.0.0", "secret"));
 		assert.throws(() => validateSseAuthConfiguration("0.0.0.0"), /MOBILEMCP_AUTH/);
+	});
+
+	it("validates SSE bearer tokens without accepting malformed headers", () => {
+		assert.equal(hasValidBearerToken("Bearer secret-token", "secret-token"), true);
+		assert.equal(hasValidBearerToken("Bearer wrong-token", "secret-token"), false);
+		assert.equal(hasValidBearerToken("Basic secret-token", "secret-token"), false);
+		assert.equal(hasValidBearerToken(undefined, "secret-token"), false);
+	});
+
+	it("formats fatal startup errors for sanitized logging", () => {
+		const formatted = sanitizeForLog(formatFatalError(new Error("startup failed text: \"123456\" Authorization: Bearer super-secret")));
+
+		assert.ok(formatted.includes("startup failed"));
+		assert.ok(!formatted.includes("123456"));
+		assert.ok(!formatted.includes("super-secret"));
 	});
 });

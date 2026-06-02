@@ -13,8 +13,9 @@ export const sanitizeForLog = (value: unknown): string => {
 	}
 
 	return text
-		.replace(/("?(?:text|password|passcode|token|authorization|api[_-]?key|secret|content|data)"?\s*[:=]\s*)("[^"]*"|[^\s,}]+)/gi, `$1"${SENSITIVE_VALUE}"`)
+		.replace(/("?(?:authorization)"?\s*[:=]\s*)(?:Bearer\s+)?("[^"]*"|[A-Za-z0-9._~+/-]+=*)/gi, `$1"${SENSITIVE_VALUE}"`)
 		.replace(/(Bearer\s+)[A-Za-z0-9._~+/-]+=*/gi, `$1${SENSITIVE_VALUE}`)
+		.replace(/("?(?:text|password|passcode|token|authorization|api[_-]?key|secret|content|data)"?\s*[:=]\s*)("[^"]*"|[^\s,}]+)/gi, `$1"${SENSITIVE_VALUE}"`)
 		.replace(/(https?:\/\/)[^\s"]+/gi, `$1${SENSITIVE_VALUE}`);
 };
 

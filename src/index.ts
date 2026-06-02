@@ -3,8 +3,11 @@ import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { createMcpServer, getAgentVersion } from "./server";
 import { error } from "./logger";
+import { timingSafeEqual } from "node:crypto";
 import express from "express";
 import { program } from "commander";
+
+const AUTH_HEADER_PREFIX = "Bearer ";
 
 export const isLocalSseHost = (host: string): boolean => {
 	const normalized = host.toLowerCase();
@@ -15,6 +18,30 @@ export const validateSseAuthConfiguration = (host: string, authToken?: string): 
 	if (!isLocalSseHost(host) && !authToken) {
 		throw new Error("MOBILEMCP_AUTH is required when --listen binds to a non-localhost interface.");
 	}
+};
+
+export const hasValidBearerToken = (authorizationHeader: string | undefined, authToken: string): boolean => {
+	if (!authorizationHeader?.startsWith(AUTH_HEADER_PREFIX)) {
+		return false;
+	}
+
+	const suppliedToken = authorizationHeader.substring(AUTH_HEADER_PREFIX.length);
+	const supplied = Buffer.from(suppliedToken);
+	const expected = Buffer.from(authToken);
+
+	if (supplied.length !== expected.length) {
+		return false;
+	}
+
+	return timingSafeEqual(supplied, expected);
+};
+
+export const formatFatalError = (err: unknown): string => {
+	if (err instanceof Error) {
+		return err.stack || err.message;
+	}
+
+	return String(err);
 };
 
 export const startSseServer = async (host: string, port: number) => {
@@ -30,7 +57,7 @@ export const startSseServer = async (host: string, port: number) => {
 
 	if (authToken) {
 		app.use((req, res, next) => {
-			if (req.headers.authorization !== `Bearer ${authToken}`) {
+			if (!hasValidBearerToken(req.headers.authorization, authToken)) {
 				res.status(401).json({ error: "Unauthorized" });
 				return;
 			}
@@ -91,8 +118,7 @@ export const startStdioServer = async () => {
 
 		error("mobile-mcp server running on stdio");
 	} catch (err: any) {
-		console.error("Fatal error in main():", err);
-		error("Fatal error in main(): " + JSON.stringify(err.stack));
+		error(`Fatal error in main(): ${formatFatalError(err)}`);
 		process.exit(1);
 	}
 };
@@ -133,7 +159,7 @@ export const main = async () => {
 
 if (require.main === module) {
 	main().catch((err: any) => {
-		error(`Fatal error in main(): ${err.message}`);
+		error(`Fatal error in main(): ${formatFatalError(err)}`);
 		process.exit(1);
 	});
 }
