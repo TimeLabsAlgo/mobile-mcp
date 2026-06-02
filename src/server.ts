@@ -3,10 +3,10 @@ import { z } from "zod";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import crypto from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { ChildProcess } from "node:child_process";
 
-import { error, trace } from "./logger";
+import { error, sanitizeForLog, trace } from "./logger";
 import { AndroidRobot, AndroidDeviceManager } from "./android";
 import { ActionableError, Robot } from "./robot";
 import { IosManager, IosRobot } from "./ios";
@@ -43,6 +43,43 @@ export const getAgentVersion = (): string => {
 	return json.version;
 };
 
+const POSTHOG_URL = "https://us.i.posthog.com/i/v0/e/";
+const POSTHOG_API_KEY = "phc_KHRTZmkDsU7A8EbydEK8s4lJpPoTDyyBhSlwer694cS";
+const telemetryDistinctId = randomUUID();
+
+export const isTelemetryEnabled = (): boolean => {
+	return process.env.MOBILEMCP_ENABLE_TELEMETRY === "1" && !process.env.MOBILEMCP_DISABLE_TELEMETRY;
+};
+
+export const createTelemetryPayload = (
+	event: string,
+	properties: Record<string, string | number>,
+	agentVersion: string,
+	clientName: string
+) => {
+	const systemProps: Record<string, string | number> = {
+		"Platform": os.platform(),
+		"Product": "mobile-mcp",
+		"Version": agentVersion,
+		"NodeVersion": process.version,
+		"CI": process.env.CI || "0",
+	};
+
+	if (clientName !== "unknown") {
+		systemProps.AgentName = clientName;
+	}
+
+	return {
+		api_key: POSTHOG_API_KEY,
+		event,
+		properties: {
+			...systemProps,
+			...properties,
+		},
+		distinct_id: telemetryDistinctId,
+	};
+};
+
 export const createMcpServer = (): McpServer => {
 
 	const server = new McpServer({
@@ -76,11 +113,11 @@ export const createMcpServer = (): McpServer => {
 			annotations,
 		}, (async (args: any, _extra: any) => {
 			try {
-				trace(`Invoking ${name} with args: ${JSON.stringify(args)}`);
+				trace(`Invoking ${name}`);
 				const start = +new Date();
 				const response = await cb(args);
 				const duration = +new Date() - start;
-				trace(`=> ${response}`);
+				trace(`Completed ${name} in ${duration}ms`);
 				posthog("tool_invoked", { "ToolName": name, "Duration": duration }).then();
 				return {
 					content: [{ type: "text", text: response }],
@@ -93,7 +130,7 @@ export const createMcpServer = (): McpServer => {
 					};
 				} else {
 					// a real exception
-					trace(`Tool '${description}' failed: ${error.message} stack: ${error.stack}`);
+					trace(`Tool '${description}' failed: ${sanitizeForLog(error.message)} stack: ${sanitizeForLog(error.stack)}`);
 					return {
 						content: [{ type: "text", text: `Error: ${error.message}` }],
 						isError: true,
@@ -104,42 +141,17 @@ export const createMcpServer = (): McpServer => {
 	};
 
 	const posthog = async (event: string, properties: Record<string, string | number>) => {
-		if (process.env.MOBILEMCP_DISABLE_TELEMETRY) {
+		if (!isTelemetryEnabled()) {
 			return;
 		}
 
 		try {
-			const url = "https://us.i.posthog.com/i/v0/e/";
-			const api_key = "phc_KHRTZmkDsU7A8EbydEK8s4lJpPoTDyyBhSlwer694cS";
-			const name = os.hostname() + process.execPath;
-			const distinct_id = crypto.createHash("sha256").update(name).digest("hex");
-			const systemProps: any = {
-				Platform: os.platform(),
-				Product: "mobile-mcp",
-				Version: getAgentVersion(),
-				NodeVersion: process.version,
-				CI: process.env.CI || "0",
-			};
-
-			const clientName = getClientName();
-			if (clientName !== "unknown") {
-				systemProps.AgentName = clientName;
-			}
-
-			await fetch(url, {
+			await fetch(POSTHOG_URL, {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json"
 				},
-				body: JSON.stringify({
-					api_key,
-					event,
-					properties: {
-						...systemProps,
-						...properties,
-					},
-					distinct_id,
-				})
+				body: JSON.stringify(createTelemetryPayload(event, properties, getAgentVersion(), getClientName()))
 			});
 		} catch (err: any) {
 			// ignore
@@ -595,7 +607,7 @@ export const createMcpServer = (): McpServer => {
 				await robot.pressButton("ENTER");
 			}
 
-			return `Typed text: ${text}`;
+			return "Typed text into the focused element";
 		}
 	);
 
@@ -663,13 +675,7 @@ export const createMcpServer = (): McpServer => {
 
 				const screenshot64 = screenshot.toString("base64");
 				trace(`Screenshot taken: ${screenshot.length} bytes`);
-				posthog("tool_invoked", {
-					"ToolName": "mobile_take_screenshot",
-					"ScreenshotFilesize": screenshot64.length,
-					"ScreenshotMimeType": mimeType,
-					"ScreenshotWidth": pngSize.width,
-					"ScreenshotHeight": pngSize.height,
-				}).then();
+				posthog("tool_invoked", { "ToolName": "mobile_take_screenshot" }).then();
 
 				return {
 					content: [{ type: "image", data: screenshot64, mimeType }]

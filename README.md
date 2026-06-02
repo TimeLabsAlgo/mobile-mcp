@@ -361,20 +361,22 @@ npx @mobilenext/mobile-mcp@latest --listen 3000
 This binds to `localhost:3000`. To bind to a specific interface:
 
 ```bash
-npx @mobilenext/mobile-mcp@latest --listen 0.0.0.0:3000
+MOBILEMCP_AUTH=my-secret-token npx @mobilenext/mobile-mcp@latest --listen 0.0.0.0:3000
 ```
 
 Then configure your MCP client to connect to `http://<host>:3000/mcp`.
 
 #### Authorization
 
-To require Bearer token authorization on the SSE server, set the `MOBILEMCP_AUTH` environment variable:
+Bearer token authorization is optional for localhost-only SSE, but required when binding SSE to a non-localhost interface. Set the `MOBILEMCP_AUTH` environment variable:
 
 ```bash
 MOBILEMCP_AUTH=my-secret-token npx @mobilenext/mobile-mcp@latest --listen 3000
 ```
 
 When set, all requests must include the header `Authorization: Bearer my-secret-token`.
+
+For private security testing, keep the default stdio transport or localhost SSE whenever possible. If you expose SSE on a network interface, use a strong token and do not reuse credentials from other services.
 
 ### 🛠️ How to Use 📝
 
@@ -462,10 +464,10 @@ Make sure you have your mobile platform SDKs (Xcode, Android SDK) installed and 
 
 ### Telemetry
 
-Mobile MCP collects anonymous usage telemetry via PostHog. To disable it, set the `MOBILEMCP_DISABLE_TELEMETRY` environment variable:
+Mobile MCP does not send telemetry by default. To explicitly opt in to anonymous usage telemetry via PostHog, set the `MOBILEMCP_ENABLE_TELEMETRY` environment variable:
 
 ```bash
-MOBILEMCP_DISABLE_TELEMETRY=1 npx @mobilenext/mobile-mcp@latest
+MOBILEMCP_ENABLE_TELEMETRY=1 npx @mobilenext/mobile-mcp@latest
 ```
 
 For json configurations:
@@ -477,12 +479,16 @@ For json configurations:
       "command": "npx",
       "args": ["-y", "@mobilenext/mobile-mcp@latest"],
       "env": {
-        "MOBILEMCP_DISABLE_TELEMETRY": "1"
+        "MOBILEMCP_ENABLE_TELEMETRY": "1"
       }
     }
   }
 }
 ```
+
+Telemetry opt-in never sends screenshots, screen contents, typed text, tool arguments, tool responses, crash report contents, hostnames, or executable paths. The legacy `MOBILEMCP_DISABLE_TELEMETRY=1` setting is still respected and takes precedence over opt-in.
+
+For private security testing, prefer pinning the package version instead of using `@latest`, for example `@mobilenext/mobile-mcp@0.0.57`, and use a dedicated test device or simulator without production accounts.
 
 ### Running in "headless" mode on Simulators/Emulators
 

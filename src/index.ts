@@ -6,13 +6,26 @@ import { error } from "./logger";
 import express from "express";
 import { program } from "commander";
 
-const startSseServer = async (host: string, port: number) => {
+export const isLocalSseHost = (host: string): boolean => {
+	const normalized = host.toLowerCase();
+	return normalized === "localhost" || normalized === "127.0.0.1" || normalized === "::1";
+};
+
+export const validateSseAuthConfiguration = (host: string, authToken?: string): void => {
+	if (!isLocalSseHost(host) && !authToken) {
+		throw new Error("MOBILEMCP_AUTH is required when --listen binds to a non-localhost interface.");
+	}
+};
+
+export const startSseServer = async (host: string, port: number) => {
 	const app = express();
 	const server = createMcpServer();
 
 	const authToken = process.env.MOBILEMCP_AUTH;
+	validateSseAuthConfiguration(host, authToken);
+
 	if (!authToken) {
-		error("WARNING: MOBILEMCP_AUTH is not set. The SSE server will accept unauthenticated connections. Set MOBILEMCP_AUTH to require Bearer token authentication.");
+		error("WARNING: MOBILEMCP_AUTH is not set. The SSE server will accept unauthenticated localhost connections only.");
 	}
 
 	if (authToken) {
@@ -69,7 +82,7 @@ const startSseServer = async (host: string, port: number) => {
 	});
 };
 
-const startStdioServer = async () => {
+export const startStdioServer = async () => {
 	try {
 		const transport = new StdioServerTransport();
 
@@ -84,7 +97,7 @@ const startStdioServer = async () => {
 	}
 };
 
-const main = async () => {
+export const main = async () => {
 	program
 		.version(getAgentVersion())
 		.option("--listen <listen>", "Start SSE server on [host:]port")
@@ -118,4 +131,9 @@ const main = async () => {
 	}
 };
 
-main().then();
+if (require.main === module) {
+	main().catch((err: any) => {
+		error(`Fatal error in main(): ${err.message}`);
+		process.exit(1);
+	});
+}

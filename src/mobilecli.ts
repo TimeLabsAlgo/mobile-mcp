@@ -2,6 +2,8 @@ import { existsSync } from "node:fs";
 import { dirname, join, sep } from "node:path";
 import { execFileSync, spawn, ChildProcess } from "node:child_process";
 
+import { validateExecutablePath } from "./utils";
+
 export interface MobilecliCrashEntry {
 	processName: string;
 	timestamp: string;
@@ -85,7 +87,7 @@ export class Mobilecli {
 
 	private static getMobilecliPath(): string {
 		if (process.env.MOBILECLI_PATH) {
-			return process.env.MOBILECLI_PATH;
+			return validateExecutablePath(process.env.MOBILECLI_PATH, "MOBILECLI_PATH");
 		}
 
 		const platform = process.platform;

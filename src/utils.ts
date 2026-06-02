@@ -15,6 +15,26 @@ export function validateLocale(locale: string): void {
 	}
 }
 
+export function validateExecutablePath(filePath: string, envName: string): string {
+	const resolved = path.resolve(filePath);
+	if (!path.isAbsolute(filePath)) {
+		throw new ActionableError(`${envName} must be an absolute path to an executable file.`);
+	}
+
+	let stats: fs.Stats;
+	try {
+		stats = fs.statSync(resolved);
+	} catch {
+		throw new ActionableError(`${envName} points to a file that does not exist: ${resolved}`);
+	}
+
+	if (!stats.isFile()) {
+		throw new ActionableError(`${envName} must point to an executable file, not a directory: ${resolved}`);
+	}
+
+	return resolved;
+}
+
 function getAllowedRoots(): string[] {
 	const roots = [
 		os.tmpdir(),

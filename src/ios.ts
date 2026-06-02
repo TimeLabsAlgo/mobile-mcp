@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 
 import { WebDriverAgent } from "./webdriver-agent";
 import { ActionableError, Button, InstalledApp, Robot, ScreenSize, SwipeDirection, ScreenElement, Orientation } from "./robot";
-import { validatePackageName, validateLocale } from "./utils";
+import { validateExecutablePath, validatePackageName, validateLocale } from "./utils";
 
 const WDA_PORT = 8100;
 const IOS_TUNNEL_PORT = 60105;
@@ -33,7 +33,7 @@ export interface IosDevice {
 
 const getGoIosPath = (): string => {
 	if (process.env.GO_IOS_PATH) {
-		return process.env.GO_IOS_PATH;
+		return validateExecutablePath(process.env.GO_IOS_PATH, "GO_IOS_PATH");
 	}
 
 	// fallback to go-ios in PATH via `npm install -g go-ios`
